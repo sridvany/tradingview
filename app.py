@@ -176,6 +176,7 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
         )
 
     all_rows = []
+    son_hata = None
     for start in range(0, 1500, 150):
         payload = {
             "columns": api_alanlari,
@@ -186,6 +187,7 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
         }
         res = requests.post(url, headers=headers, json=payload, timeout=20)
         if res.status_code != 200:
+            son_hata = f"HTTP {res.status_code}: {res.text[:500]}"
             break
         data = res.json().get("data", [])
         if not data:
@@ -193,12 +195,11 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
         for item in data:
             d = item["d"]
             row = dict(zip(gosterim_adlari, d))
-            # Sektörü Türkçeleştir
             row["Sektör"] = SEKTOR_TR.get(row.get("Sektör"), row.get("Sektör") or "")
             all_rows.append(row)
         if len(data) < 150:
             break
-    return pd.DataFrame(all_rows, columns=gosterim_adlari)
+    return pd.DataFrame(all_rows, columns=gosterim_adlari), son_hata
 
 
 st.title("📊 TradingView Scanner")
@@ -220,9 +221,11 @@ sadece_yerli = st.checkbox(
 market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    df = veri_cek(market, country, sadece_yerli)
+    df, hata = veri_cek(market, country, sadece_yerli)
     if df.empty:
-        st.error("Veri çekilemedi. Bağlantını veya API durumunu kontrol et.")
+        st.error("Veri çekilemedi.")
+        if hata:
+            st.code(hata)
     else:
         st.success(f"{secim}: {len(df)} şirket çekildi.")
 
