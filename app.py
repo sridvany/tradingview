@@ -4,6 +4,31 @@ import pandas as pd
 
 st.set_page_config(page_title="TradingView Piyasa Tarayıcı", page_icon="📊")
 
+# TradingView sektör adları -> Türkçe
+SEKTOR_TR = {
+    "Commercial Services": "Ticari Hizmetler",
+    "Communications": "İletişim",
+    "Consumer Durables": "Dayanıklı Tüketim",
+    "Consumer Non-Durables": "Tüketim (Dayanıksız)",
+    "Consumer Services": "Tüketici Hizmetleri",
+    "Distribution Services": "Dağıtım Hizmetleri",
+    "Electronic Technology": "Elektronik Teknoloji",
+    "Energy Minerals": "Enerji Madenleri",
+    "Finance": "Finans",
+    "Government": "Devlet",
+    "Health Services": "Sağlık Hizmetleri",
+    "Health Technology": "Sağlık Teknolojisi",
+    "Industrial Services": "Endüstriyel Hizmetler",
+    "Miscellaneous": "Çeşitli",
+    "Non-Energy Minerals": "Enerji Dışı Madenler",
+    "Process Industries": "İşlenebilen Endüstriler",
+    "Producer Manufacturing": "Üretici İmalatı",
+    "Retail Trade": "Perakende Ticaret",
+    "Technology Services": "Teknoloji Hizmetleri",
+    "Transportation": "Taşımacılık",
+    "Utilities": "Elektrik, Su, Gaz Hizmetleri",
+}
+
 # Türkçe isim -> (TradingView market kodu, country alanındaki İngilizce isim)
 PIYASALAR = {
     "Türkiye": ("turkey", "Turkey"),
@@ -88,7 +113,7 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
         "referer": "https://www.tradingview.com/",
     }
     columns = ["name", "description", "country", "exchange",
-               "currency", "market_cap_basic"]
+               "currency", "sector", "market_cap_basic"]
     filtreler = [{"left": "type", "operation": "equal", "right": "stock"}]
     if sadece_yerli:
         filtreler.append(
@@ -118,7 +143,8 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
                 "Ülke": d[2],
                 "Borsa": d[3],
                 "Para Birimi": d[4],
-                "Piyasa Değeri": d[5],
+                "Sektör": SEKTOR_TR.get(d[5], d[5] or ""),
+                "Piyasa Değeri": d[6],
             })
         if len(data) < 150:
             break
