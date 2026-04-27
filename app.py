@@ -1,22 +1,21 @@
 import streamlit as st
 import requests
 import pandas as pd
-import io
 
 # Sayfa Başlığı
 st.set_page_config(page_title="BIST Piyasa Değeri", page_icon="📊")
 
 @st.cache_data(ttl=3600)
-def veri_cek():
-    url = "https://scanner.tradingview.com/turkey/scan"
+def veri_cek(market: str):
+    url = f"https://scanner.tradingview.com/{market}/scan"
     headers = {"User-Agent": "Mozilla/5.0"}
     all_data = []
     
-    # 600 hisse için döngü (150'şerli paketler)
+    # 750 hisse için döngü (150'şerli paketler)
     for start in range(0, 750, 150):
         payload = {
             "columns": ["name", "description", "market_cap_basic"],
-            "markets": ["turkey"],
+            "markets": [market],
             "range": [start, start + 150],
             "sort": {"sortBy": "market_cap_basic", "sortOrder": "desc"}
         }
@@ -31,27 +30,28 @@ def veri_cek():
                 })
     return pd.DataFrame(all_data)
 
-st.title("🇹🇷 BIST Piyasa Değeri Tarayıcı")
+st.title("📊 TradingView Piyasa Değeri Tarayıcı")
+
+market = st.text_input(
+    "Piyasa (ülke) adı:",
+    value="turkey",
+    help="Örnek: turkey, america, germany, uk, japan, india, france, italy, brazil, china, crypto"
+).strip().lower()
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    df = veri_cek()
+    df = veri_cek(market)
     
     if not df.empty:
         st.success(f"{len(df)} şirket verisi başarıyla çekildi.")
         st.dataframe(df, use_container_width=True)
 
-        # Excel Dosyası Hazırlama
-        buffer = io.BytesIO()
-        # Engine olarak openpyxl kullanıyoruz
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='BIST_Veri')
-        
-        # İndirme Butonu
+        # CSV İndirme
+        csv = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
-            label="📥 Excel Dosyasını İndir",
-            data=buffer.getvalue(),
-            file_name="BIST_Piyasa_Degerleri.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="📥 CSV Dosyasını İndir",
+            data=csv,
+            file_name=f"{market}_Piyasa_Degerleri.csv",
+            mime="text/csv"
         )
     else:
-        st.error("Veri çekilemedi. Lütfen internet bağlantınızı veya API durumunu kontrol edin.")
+        st.error("Veri çekilemedi. Piyasa adını kontrol et veya bağlantını test et.")
