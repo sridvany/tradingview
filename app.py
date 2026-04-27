@@ -127,10 +127,14 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
 
 st.title("📊 TradingView Piyasa Değeri Tarayıcı")
 
+# Türkçe karakter farkını aşmak için sıralama anahtarı
+def tr_key(s: str) -> str:
+    return s.translate(str.maketrans("ÇĞİıÖŞÜçğıöşü", "CGIIOSUcgiosu")).lower()
+
 secim = st.selectbox(
     "Piyasa (ülke) seç:",
-    options=sorted(PIYASALAR.keys()),
-    index=sorted(PIYASALAR.keys()).index("Türkiye"),
+    options=sorted(PIYASALAR.keys(), key=tr_key),
+    index=sorted(PIYASALAR.keys(), key=tr_key).index("Türkiye"),
 )
 sadece_yerli = st.checkbox(
     "Sadece bu ülkenin şirketleri (yabancı/ETF/çapraz kotluları gizle)",
