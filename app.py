@@ -148,7 +148,6 @@ NAKIT_KOLONLARI = [
     ("cash_f_financing_activities_ttm", "Finansman Nakit Akışı (TTM)"),
     ("free_cash_flow_ttm", "Serbest Nakit Akışı (TTM)"),
     ("capital_expenditures_ttm", "Yatırım Harcamaları / CapEx (TTM)"),
-    ("net_income_ttm", "Net Kar (TTM)"),
 ]
 
 TUM_KOLONLAR = ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI + NAKIT_KOLONLARI
