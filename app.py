@@ -110,8 +110,8 @@ ORTAK_KOLONLAR = [
     ("currency", "Para Birimi"),
     ("sector", "Sektör"),
     ("market_cap_basic", "Piyasa Değeri"),
-    ("fiscal_period_fq", "Mali Dönem"),
-    ("fiscal_period_end_fq", "Mali Dönem Sonu"),
+    ("fiscal_period", "Mali Dönem"),
+    ("fiscal_period_end", "Mali Dönem Sonu"),
 ]
 
 GELIR_KOLONLARI = [
@@ -156,7 +156,7 @@ TUM_KOLONLAR = ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI + NAKIT_KOLO
 
 
 @st.cache_data(ttl=3600)
-def veri_cek_v3(market: str, country: str, sadece_yerli: bool):
+def veri_cek_v4(market: str, country: str, sadece_yerli: bool):
     url = f"https://scanner.tradingview.com/{market}/scan"
     headers = {
         "authority": "scanner.tradingview.com",
@@ -229,7 +229,7 @@ sadece_yerli = st.checkbox(
 market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    df, hata = veri_cek_v3(market, country, sadece_yerli)
+    df, hata = veri_cek_v4(market, country, sadece_yerli)
     if df.empty:
         st.error("Veri çekilemedi.")
         if hata:
