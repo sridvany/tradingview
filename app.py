@@ -154,7 +154,7 @@ TUM_KOLONLAR = ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI + NAKIT_KOLO
 
 
 @st.cache_data(ttl=3600)
-def veri_cek(market: str, country: str, sadece_yerli: bool):
+def veri_cek_v2(market: str, country: str, sadece_yerli: bool):
     url = f"https://scanner.tradingview.com/{market}/scan"
     headers = {
         "authority": "scanner.tradingview.com",
@@ -198,7 +198,10 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
             all_rows.append(row)
         if len(data) < 150:
             break
-    return pd.DataFrame(all_rows, columns=gosterim_adlari), son_hata
+    df_son = pd.DataFrame(all_rows, columns=gosterim_adlari)
+    # Olası çift kolon adlarını temizle
+    df_son = df_son.loc[:, ~df_son.columns.duplicated()]
+    return df_son, son_hata
 
 
 st.title("📊 TradingView Scanner")
@@ -220,7 +223,7 @@ sadece_yerli = st.checkbox(
 market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    df, hata = veri_cek(market, country, sadece_yerli)
+    df, hata = veri_cek_v2(market, country, sadece_yerli)
     if df.empty:
         st.error("Veri çekilemedi.")
         if hata:
