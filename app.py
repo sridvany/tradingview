@@ -101,6 +101,59 @@ PIYASALAR = {
 }
 
 
+# Kolon grupları: (api_alani, gosterim_adi)
+ORTAK_KOLONLAR = [
+    ("name", "Hisse"),
+    ("description", "Şirket"),
+    ("country", "Ülke"),
+    ("exchange", "Borsa"),
+    ("currency", "Para Birimi"),
+    ("sector", "Sektör"),
+    ("market_cap_basic", "Piyasa Değeri"),
+]
+
+GELIR_KOLONLARI = [
+    ("total_revenue_ttm", "Gelir (TTM)"),
+    ("total_revenue_yoy_growth_ttm", "Gelir Büyüme YY % (TTM)"),
+    ("gross_profit_ttm", "Brüt Kar (TTM)"),
+    ("operating_income_ttm", "Faaliyet Geliri (TTM)"),
+    ("ebitda_ttm", "FAVÖK (TTM)"),
+    ("net_income_ttm", "Net Kar (TTM)"),
+    ("earnings_per_share_basic_ttm", "EPS Temel (TTM)"),
+    ("earnings_per_share_diluted_ttm", "EPS Seyreltilmiş (TTM)"),
+    ("earnings_per_share_diluted_yoy_growth_ttm", "EPS Büyüme YY % (TTM)"),
+    ("gross_margin_ttm", "Brüt Marj % (TTM)"),
+    ("operating_margin_ttm", "Faaliyet Marjı % (TTM)"),
+    ("net_margin_ttm", "Net Marj % (TTM)"),
+]
+
+BILANCO_KOLONLARI = [
+    ("total_assets_fq", "Toplam Varlıklar"),
+    ("total_current_assets_fq", "Dönen Varlıklar"),
+    ("cash_n_short_term_invest_fq", "Nakit ve Kısa Vad. Yatırımlar"),
+    ("total_liabilities_fq", "Toplam Yükümlülükler"),
+    ("total_current_liabilities_fq", "Kısa Vad. Yükümlülükler"),
+    ("total_debt_fq", "Toplam Borç"),
+    ("long_term_debt_fq", "Uzun Vad. Borç"),
+    ("total_equity_fq", "Özkaynaklar"),
+    ("book_value_per_share_fq", "Defter Değeri / Hisse"),
+    ("current_ratio_fq", "Cari Oran"),
+    ("quick_ratio_fq", "Asit-Test Oranı"),
+    ("debt_to_equity_fq", "Borç / Özkaynak"),
+]
+
+NAKIT_KOLONLARI = [
+    ("cash_f_operating_activities_ttm", "Faaliyet Nakit Akışı (TTM)"),
+    ("cash_f_investing_activities_ttm", "Yatırım Nakit Akışı (TTM)"),
+    ("cash_f_financing_activities_ttm", "Finansman Nakit Akışı (TTM)"),
+    ("free_cash_flow_ttm", "Serbest Nakit Akışı (TTM)"),
+    ("capital_expenditures_ttm", "Yatırım Harcamaları / CapEx (TTM)"),
+    ("net_income_ttm", "Net Kar (TTM)"),
+]
+
+TUM_KOLONLAR = ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI + NAKIT_KOLONLARI
+
+
 @st.cache_data(ttl=3600)
 def veri_cek(market: str, country: str, sadece_yerli: bool):
     url = f"https://scanner.tradingview.com/{market}/scan"
@@ -113,18 +166,19 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
         "origin": "https://www.tradingview.com",
         "referer": "https://www.tradingview.com/",
     }
-    columns = ["name", "description", "country", "exchange",
-               "currency", "sector", "market_cap_basic"]
+    api_alanlari = [k[0] for k in TUM_KOLONLAR]
+    gosterim_adlari = [k[1] for k in TUM_KOLONLAR]
+
     filtreler = [{"left": "type", "operation": "equal", "right": "stock"}]
     if sadece_yerli:
         filtreler.append(
             {"left": "country", "operation": "equal", "right": country}
         )
 
-    all_data = []
+    all_rows = []
     for start in range(0, 1500, 150):
         payload = {
-            "columns": columns,
+            "columns": api_alanlari,
             "markets": [market],
             "filter": filtreler,
             "range": [start, start + 150],
@@ -138,18 +192,13 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
             break
         for item in data:
             d = item["d"]
-            all_data.append({
-                "Hisse": d[0],
-                "Şirket": d[1],
-                "Ülke": d[2],
-                "Borsa": d[3],
-                "Para Birimi": d[4],
-                "Sektör": SEKTOR_TR.get(d[5], d[5] or ""),
-                "Piyasa Değeri": d[6],
-            })
+            row = dict(zip(gosterim_adlari, d))
+            # Sektörü Türkçeleştir
+            row["Sektör"] = SEKTOR_TR.get(row.get("Sektör"), row.get("Sektör") or "")
+            all_rows.append(row)
         if len(data) < 150:
             break
-    return pd.DataFrame(all_data)
+    return pd.DataFrame(all_rows, columns=gosterim_adlari)
 
 
 st.title("📊 TradingView Scanner")
@@ -172,18 +221,38 @@ market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
     df = veri_cek(market, country, sadece_yerli)
-    if not df.empty:
+    if df.empty:
+        st.error("Veri çekilemedi. Bağlantını veya API durumunu kontrol et.")
+    else:
         st.success(f"{secim}: {len(df)} şirket çekildi.")
-        st.dataframe(df, use_container_width=True)
+
+        ortak_adlar = [k[1] for k in ORTAK_KOLONLAR]
+        df_genel = df[ortak_adlar]
+        df_gelir = df[ortak_adlar + [k[1] for k in GELIR_KOLONLARI]]
+        df_bilanco = df[ortak_adlar + [k[1] for k in BILANCO_KOLONLARI]]
+        df_nakit = df[ortak_adlar + [k[1] for k in NAKIT_KOLONLARI]]
+
+        sek1, sek2, sek3, sek4 = st.tabs(
+            ["Genel", "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
+        )
+        with sek1:
+            st.dataframe(df_genel, use_container_width=True)
+        with sek2:
+            st.dataframe(df_gelir, use_container_width=True)
+        with sek3:
+            st.dataframe(df_bilanco, use_container_width=True)
+        with sek4:
+            st.dataframe(df_nakit, use_container_width=True)
 
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Veriler")
+            df_genel.to_excel(writer, index=False, sheet_name="Genel")
+            df_gelir.to_excel(writer, index=False, sheet_name="Gelir Tablosu")
+            df_bilanco.to_excel(writer, index=False, sheet_name="Bilanço")
+            df_nakit.to_excel(writer, index=False, sheet_name="Nakit Akışı")
         st.download_button(
             label="📥 Excel Dosyasını İndir",
             data=buffer.getvalue(),
-            file_name=f"{market}_Piyasa_Degerleri.xlsx",
+            file_name=f"{market}_Finansallar.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-    else:
-        st.error("Veri çekilemedi. Bağlantını veya API durumunu kontrol et.")
