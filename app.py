@@ -116,7 +116,7 @@ GELIR_KOLONLARI = [
     ("total_revenue_ttm", "Gelir (TTM)"),
     ("total_revenue_yoy_growth_ttm", "Gelir Büyüme YY % (TTM)"),
     ("gross_profit_ttm", "Brüt Kar (TTM)"),
-    ("operating_income_ttm", "Faaliyet Geliri (TTM)"),
+    ("oper_income_ttm", "Faaliyet Geliri (TTM)"),
     ("ebitda_ttm", "FAVÖK (TTM)"),
     ("net_income_ttm", "Net Kar (TTM)"),
     ("earnings_per_share_basic_ttm", "EPS Temel (TTM)"),
