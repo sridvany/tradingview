@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import io
 
 st.set_page_config(page_title="TradingView Piyasa Tarayıcı", page_icon="📊")
 
@@ -175,12 +176,14 @@ if st.button("Piyasayı Tara ve Verileri Getir"):
         st.success(f"{secim}: {len(df)} şirket çekildi.")
         st.dataframe(df, use_container_width=True)
 
-        csv = df.to_csv(index=False).encode("utf-8-sig")
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Veriler")
         st.download_button(
-            label="📥 CSV Dosyasını İndir",
-            data=csv,
-            file_name=f"{market}_Piyasa_Degerleri.csv",
-            mime="text/csv",
+            label="📥 Excel Dosyasını İndir",
+            data=buffer.getvalue(),
+            file_name=f"{market}_Piyasa_Degerleri.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     else:
         st.error("Veri çekilemedi. Bağlantını veya API durumunu kontrol et.")
