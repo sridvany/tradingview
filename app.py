@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import io
 
-st.set_page_config(page_title="TradingView Piyasa Tarayıcı", page_icon="📊")
+st.set_page_config(page_title="TradingView Scanner", page_icon="📊")
 
 # TradingView sektör adları -> Türkçe
 SEKTOR_TR = {
@@ -152,7 +152,7 @@ def veri_cek(market: str, country: str, sadece_yerli: bool):
     return pd.DataFrame(all_data)
 
 
-st.title("📊 TradingView Piyasa Değeri Tarayıcı")
+st.title("📊 TradingView Scanner")
 
 # Türkçe karakter farkını aşmak için sıralama anahtarı
 def tr_key(s: str) -> str:
