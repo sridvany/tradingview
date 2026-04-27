@@ -110,6 +110,8 @@ ORTAK_KOLONLAR = [
     ("currency", "Para Birimi"),
     ("sector", "Sektör"),
     ("market_cap_basic", "Piyasa Değeri"),
+    ("fiscal_period_fq_h", "Mali Dönem"),
+    ("fiscal_period_end_fq_h", "Mali Dönem Sonu"),
 ]
 
 GELIR_KOLONLARI = [
