@@ -195,6 +195,10 @@ def veri_cek_v2(market: str, country: str, sadece_yerli: bool):
             d = item["d"]
             row = dict(zip(gosterim_adlari, d))
             row["Sektör"] = SEKTOR_TR.get(row.get("Sektör"), row.get("Sektör") or "")
+            # CapEx muhasebede negatif gelir (nakit çıkışı) -> mutlak değere çevir
+            capex = row.get("Yatırım Harcamaları / CapEx (TTM)")
+            if isinstance(capex, (int, float)):
+                row["Yatırım Harcamaları / CapEx (TTM)"] = abs(capex)
             all_rows.append(row)
         if len(data) < 150:
             break
