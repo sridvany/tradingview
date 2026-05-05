@@ -125,6 +125,7 @@ GELIR_KOLONLARI = [
     ("gross_margin_ttm", "Brüt Marj % (TTM)"),
     ("operating_margin_ttm", "Faaliyet Marjı % (TTM)"),
     ("net_margin_ttm", "Net Marj % (TTM)"),
+    ("price_earnings_ttm", "F/K (FKO)"),
 ]
 
 BILANCO_KOLONLARI = [
