@@ -245,13 +245,13 @@ st.title("📊 TradingView Screener")
 
 
 @st.cache_data(ttl=86400)
-def regresyon_hesapla(semboller: tuple):
+def regresyon_hesapla(semboller: tuple, periyot: str, min_gun: int):
     """Her hisse için log-fiyat ~ zaman regresyonu: eğim (yıllık %) ve R²."""
     import numpy as np
     import yfinance as yf
 
     data = yf.download(
-        list(semboller), period="1y", interval="1d",
+        list(semboller), period=periyot, interval="1d",
         auto_adjust=True, progress=False,
     )["Close"]
     if isinstance(data, pd.Series):
@@ -261,7 +261,7 @@ def regresyon_hesapla(semboller: tuple):
     for s in data.columns:
         fiyat = data[s].dropna()
         fiyat = fiyat[fiyat > 0]
-        if len(fiyat) < 120:  # en az ~6 ay işlem günü
+        if len(fiyat) < min_gun:
             continue
         y = np.log(fiyat.values)
         x = np.arange(len(y))
@@ -407,14 +407,26 @@ if "tarama" in st.session_state:
                 st.info("Regresyon analizi şimdilik sadece Türkiye "
                         "piyasası için destekleniyor.")
             else:
+                REG_PERIYOTLAR = {
+                    "3 Ay": ("3mo", 40),
+                    "6 Ay": ("6mo", 80),
+                    "1 Yıl": ("1y", 120),
+                    "2 Yıl": ("2y", 250),
+                }
+                reg_secim = st.selectbox(
+                    "Regresyon periyodu:",
+                    list(REG_PERIYOTLAR.keys()),
+                    index=2,
+                )
+                yf_periyot, min_gun = REG_PERIYOTLAR[reg_secim]
                 if st.button("Regresyonu Hesapla (tüm hisseler, ~1-2 dk)"):
                     semboller = tuple(
                         df["Hisse"].astype(str).str.strip() + ".IS"
                     )
                     with st.spinner("Fiyat geçmişi indiriliyor ve "
                                     "regresyon hesaplanıyor..."):
-                        st.session_state["regresyon"] = (
-                            regresyon_hesapla(semboller)
+                        st.session_state["regresyon"] = regresyon_hesapla(
+                            semboller, yf_periyot, min_gun
                         )
                 if "regresyon" in st.session_state:
                     df_reg = st.session_state["regresyon"]
@@ -425,13 +437,18 @@ if "tarama" in st.session_state:
                             df[["Hisse", "Şirket", "Sektör"]],
                             on="Hisse", how="left",
                         )
+                        df_reg["_pozitif"] = df_reg["Yıllık Eğim %"] > 0
+                        df_reg = df_reg.sort_values(
+                            ["_pozitif", "R²"], ascending=[False, False]
+                        ).drop(columns="_pozitif")
                         df_reg = df_reg[
                             ["Hisse", "Şirket", "Sektör", "Yıllık Eğim %",
                              "R²", "Regresyon Skoru", "Gün Sayısı"]
-                        ].sort_values(
-                            "R²", ascending=False
-                        ).reset_index(drop=True)
-                        st.write(f"**{len(df_reg)} hisse** analiz edildi.")
+                        ].reset_index(drop=True)
+                        st.session_state["regresyon_gosterim"] = df_reg
+                        st.write(f"**{len(df_reg)} hisse** analiz edildi. "
+                                 "Önce pozitif eğimliler (R² sıralı), "
+                                 "sonra negatifler.")
                         st.dataframe(df_reg, use_container_width=True)
 
         with sek1:
@@ -456,15 +473,10 @@ if "tarama" in st.session_state:
             df_ist_son.to_excel(
                 writer, index=False, sheet_name="İstikrarlı Yükselenler"
             )
-            if "regresyon" in st.session_state and market == "turkey":
-                r = st.session_state["regresyon"]
-                if not r.empty:
-                    r.merge(
-                        df[["Hisse", "Şirket", "Sektör"]],
-                        on="Hisse", how="left",
-                    ).sort_values(
-                        "R²", ascending=False
-                    ).to_excel(writer, index=False, sheet_name="Regresyon")
+            if "regresyon_gosterim" in st.session_state and market == "turkey":
+                st.session_state["regresyon_gosterim"].to_excel(
+                    writer, index=False, sheet_name="Regresyon"
+                )
             df_genel.to_excel(writer, index=False, sheet_name="Genel")
             df_gelir.to_excel(writer, index=False, sheet_name="Gelir Tablosu")
             df_bilanco.to_excel(writer, index=False, sheet_name="Bilanço")
