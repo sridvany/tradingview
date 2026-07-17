@@ -448,19 +448,22 @@ if "tarama" in st.session_state:
                             df[["Hisse", "Şirket", "Sektör", "F/K (FKO)"]],
                             on="Hisse", how="left",
                         )
-                        df_reg["_pozitif"] = df_reg["Yıllık Eğim %"] > 0
+                        # Sadece pozitif eğim ve R² >= 0.70
+                        df_reg = df_reg[
+                            (df_reg["Yıllık Eğim %"] > 0)
+                            & (df_reg["R²"] >= 0.70)
+                        ]
                         df_reg = df_reg.sort_values(
-                            ["_pozitif", "R²"], ascending=[False, False]
-                        ).drop(columns="_pozitif")
+                            "R²", ascending=False
+                        )
                         df_reg = df_reg[
                             ["Hisse", "Şirket", "Sektör", "Yıllık Eğim %",
                              "R²", "F/K (FKO)", "Regresyon Skoru",
                              "Gün Sayısı"]
                         ].reset_index(drop=True)
                         st.session_state["regresyon_gosterim"] = df_reg
-                        st.write(f"**{len(df_reg)} hisse** analiz edildi. "
-                                 "Önce pozitif eğimliler (R² sıralı), "
-                                 "sonra negatifler.")
+                        st.write(f"**{len(df_reg)} hisse** kriterleri "
+                                 "sağlıyor (pozitif eğim, R² ≥ 0.70).")
                         st.dataframe(df_reg, use_container_width=True)
 
                         reg_buffer = io.BytesIO()
