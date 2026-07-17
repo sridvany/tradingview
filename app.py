@@ -434,7 +434,7 @@ if "tarama" in st.session_state:
                         st.error("Fiyat geçmişi indirilemedi.")
                     else:
                         df_reg = df_reg.merge(
-                            df[["Hisse", "Şirket", "Sektör"]],
+                            df[["Hisse", "Şirket", "Sektör", "F/K (FKO)"]],
                             on="Hisse", how="left",
                         )
                         df_reg["_pozitif"] = df_reg["Yıllık Eğim %"] > 0
@@ -443,7 +443,8 @@ if "tarama" in st.session_state:
                         ).drop(columns="_pozitif")
                         df_reg = df_reg[
                             ["Hisse", "Şirket", "Sektör", "Yıllık Eğim %",
-                             "R²", "Regresyon Skoru", "Gün Sayısı"]
+                             "R²", "F/K (FKO)", "Regresyon Skoru",
+                             "Gün Sayısı"]
                         ].reset_index(drop=True)
                         st.session_state["regresyon_gosterim"] = df_reg
                         st.write(f"**{len(df_reg)} hisse** analiz edildi. "
