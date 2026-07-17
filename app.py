@@ -159,6 +159,12 @@ PERF_KOLONLARI = [
     ("Perf.Y", "1 Yıl %"),
 ]
 
+TEKNIK_KOLONLARI = [
+    ("close", "Kapanış"),
+    ("SMA50", "SMA50"),
+    ("SMA200", "SMA200"),
+]
+
 # Özet sekmesinde gösterilecek kolonlar
 OZET_ADLARI = [
     "Hisse", "Şirket", "Sektör", "Piyasa Değeri",
@@ -167,7 +173,7 @@ OZET_ADLARI = [
 
 TUM_KOLONLAR = (
     ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI
-    + NAKIT_KOLONLARI + PERF_KOLONLARI
+    + NAKIT_KOLONLARI + PERF_KOLONLARI + TEKNIK_KOLONLARI
 )
 
 
@@ -267,8 +273,8 @@ if "tarama" in st.session_state:
         df_nakit = df[ortak_adlar + [k[1] for k in NAKIT_KOLONLARI]]
         df_perf = df[["Hisse", "Şirket", "Sektör"] + perf_adlar]
 
-        sek_ozet, sek_perf, sek1, sek2, sek3, sek4 = st.tabs(
-            ["Özet", "Yükselen / Düşen", "Genel",
+        sek_ozet, sek_perf, sek_ist, sek1, sek2, sek3, sek4 = st.tabs(
+            ["Özet", "Yükselen / Düşen", "İstikrarlı Yükselenler", "Genel",
              "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
         )
         with sek_ozet:
@@ -293,6 +299,56 @@ if "tarama" in st.session_state:
                     df_p.tail(adet).iloc[::-1].reset_index(drop=True),
                     use_container_width=True,
                 )
+        with sek_ist:
+            st.caption(
+                "Skor: her periyottaki yüzdelik sıranın ortalaması (0-100). "
+                "Sapma: 1Y ≥ 6A ≥ 3A ≥ 1A ≥ 1H ≥ 0 dizilimine aykırılık sayısı "
+                "(0 = kazanç zamana düzgün yayılmış). "
+                "Trend: Kapanış > SMA50 > SMA200."
+            )
+            df_i = df[
+                ["Hisse", "Şirket", "Sektör"] + perf_adlar
+                + ["Kapanış", "SMA50", "SMA200"]
+            ].dropna(subset=perf_adlar).copy()
+
+            # Skor: periyot bazlı yüzdelik sıraların ortalaması
+            df_i["Skor"] = (
+                df_i[perf_adlar].rank(pct=True).mean(axis=1).mul(100).round(1)
+            )
+
+            # Monotonluk sapması: uzun vadeden kısaya kümülatif getiri azalmalı
+            sirali = ["1 Yıl %", "6 Ay %", "3 Ay %", "1 Ay %", "1 Hafta %"]
+            sapma = (df_i["1 Hafta %"] < 0).astype(int)
+            for a, b in zip(sirali[:-1], sirali[1:]):
+                sapma += (df_i[a] < df_i[b]).astype(int)
+            df_i["Sapma"] = sapma
+
+            df_i["Trend"] = (
+                (df_i["Kapanış"] > df_i["SMA50"])
+                & (df_i["SMA50"] > df_i["SMA200"])
+            )
+
+            f1 = st.checkbox("Tüm periyotlar pozitif olsun", value=True)
+            f2 = st.checkbox("Trend yapısı sağlansın (Fiyat > SMA50 > SMA200)",
+                             value=True)
+            max_sapma = st.slider("İzin verilen maksimum sapma", 0, 5, 1)
+
+            df_f = df_i.copy()
+            if f1:
+                df_f = df_f[(df_f[perf_adlar] > 0).all(axis=1)]
+            if f2:
+                df_f = df_f[df_f["Trend"]]
+            df_f = df_f[df_f["Sapma"] <= max_sapma]
+            df_f = df_f.sort_values("Skor", ascending=False)
+
+            st.write(f"**{len(df_f)} hisse** kriterleri sağlıyor.")
+            gosterim = (
+                ["Hisse", "Şirket", "Sektör", "Skor", "Sapma", "Trend"]
+                + perf_adlar
+            )
+            df_ist_son = df_f[gosterim].reset_index(drop=True)
+            st.dataframe(df_ist_son, use_container_width=True)
+
         with sek1:
             st.dataframe(df_genel, use_container_width=True)
         with sek2:
@@ -305,7 +361,16 @@ if "tarama" in st.session_state:
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
             df_ozet.to_excel(writer, index=False, sheet_name="Özet")
+            df_p.head(adet).to_excel(
+                writer, index=False, sheet_name=f"Yükselenler ({periyot})"
+            )
+            df_p.tail(adet).iloc[::-1].to_excel(
+                writer, index=False, sheet_name=f"Düşenler ({periyot})"
+            )
             df_perf.to_excel(writer, index=False, sheet_name="Performans")
+            df_ist_son.to_excel(
+                writer, index=False, sheet_name="İstikrarlı Yükselenler"
+            )
             df_genel.to_excel(writer, index=False, sheet_name="Genel")
             df_gelir.to_excel(writer, index=False, sheet_name="Gelir Tablosu")
             df_bilanco.to_excel(writer, index=False, sheet_name="Bilanço")
