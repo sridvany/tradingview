@@ -5,6 +5,32 @@ import io
 
 st.set_page_config(page_title="TradingView Screener", page_icon="📊")
 
+# Sekme arka plan renkleri
+st.markdown("""
+<style>
+.stTabs [data-baseweb="tab-list"] { gap: 6px; }
+.stTabs [data-baseweb="tab-list"] button {
+    border-radius: 8px 8px 0 0;
+    padding: 4px 14px;
+}
+.stTabs [data-baseweb="tab-list"] button:nth-child(1) { background-color: #FFD8A8; } /* Özet - turuncu */
+.stTabs [data-baseweb="tab-list"] button:nth-child(2) { background-color: #B2F2BB; } /* Yükselen/Düşen - yeşil */
+.stTabs [data-baseweb="tab-list"] button:nth-child(3) { background-color: #A5D8FF; } /* İstikrarlı - mavi */
+.stTabs [data-baseweb="tab-list"] button:nth-child(4) { background-color: #D0BFFF; } /* Regresyon - mor */
+.stTabs [data-baseweb="tab-list"] button:nth-child(5) { background-color: #FFC9C9; } /* Genel - kırmızı */
+.stTabs [data-baseweb="tab-list"] button:nth-child(6) { background-color: #FFF3BF; } /* Gelir - sarı */
+.stTabs [data-baseweb="tab-list"] button:nth-child(7) { background-color: #99E9F2; } /* Bilanço - camgöbeği */
+.stTabs [data-baseweb="tab-list"] button:nth-child(8) { background-color: #FCC2D7; } /* Nakit - pembe */
+.stTabs [data-baseweb="tab-list"] button p { color: #1a1a1a !important; }
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+    border-bottom: 3px solid #1a1a1a;
+}
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p {
+    font-weight: 700 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # TradingView sektör adları -> Türkçe
 SEKTOR_TR = {
     "Commercial Services": "Ticari Hizmetler",
@@ -234,6 +260,44 @@ def veri_cek_v5(market: str, country: str, sadece_yerli: bool, kolonlar: tuple):
 
 st.title("📊 TradingView Screener")
 
+
+@st.cache_data(ttl=86400)
+def regresyon_hesapla(semboller: tuple):
+    """Her hisse için log-fiyat ~ zaman regresyonu: eğim (yıllık %) ve R²."""
+    import numpy as np
+    import yfinance as yf
+
+    data = yf.download(
+        list(semboller), period="1y", interval="1d",
+        auto_adjust=True, progress=False,
+    )["Close"]
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
+
+    sonuclar = []
+    for s in data.columns:
+        fiyat = data[s].dropna()
+        fiyat = fiyat[fiyat > 0]
+        if len(fiyat) < 120:  # en az ~6 ay işlem günü
+            continue
+        y = np.log(fiyat.values)
+        x = np.arange(len(y))
+        egim, sabit = np.polyfit(x, y, 1)
+        y_tahmin = sabit + egim * x
+        ss_res = ((y - y_tahmin) ** 2).sum()
+        ss_top = ((y - y.mean()) ** 2).sum()
+        r2 = 1 - ss_res / ss_top if ss_top > 0 else 0.0
+        yillik = (np.exp(egim * 252) - 1) * 100  # yıllıklandırılmış eğim %
+        sonuclar.append({
+            "Hisse": s.split(".")[0],
+            "Yıllık Eğim %": round(yillik, 1),
+            "R²": round(r2, 3),
+            "Regresyon Skoru": round(yillik * r2, 1),
+            "Gün Sayısı": len(fiyat),
+        })
+    return pd.DataFrame(sonuclar)
+
+
 # Türkçe karakter farkını aşmak için sıralama anahtarı
 def tr_key(s: str) -> str:
     return s.translate(str.maketrans("ÇĞİıÖŞÜçğıöşü", "CGIIOSUcgiosu")).lower()
@@ -273,9 +337,9 @@ if "tarama" in st.session_state:
         df_nakit = df[ortak_adlar + [k[1] for k in NAKIT_KOLONLARI]]
         df_perf = df[["Hisse", "Şirket", "Sektör"] + perf_adlar]
 
-        sek_ozet, sek_perf, sek_ist, sek1, sek2, sek3, sek4 = st.tabs(
-            ["Özet", "Yükselen / Düşen", "İstikrarlı Yükselenler", "Genel",
-             "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
+        sek_ozet, sek_perf, sek_ist, sek_reg, sek1, sek2, sek3, sek4 = st.tabs(
+            ["Özet", "Yükselen / Düşen", "İstikrarlı Yükselenler",
+             "Regresyon", "Genel", "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
         )
         with sek_ozet:
             st.dataframe(df_ozet, use_container_width=True)
@@ -349,6 +413,44 @@ if "tarama" in st.session_state:
             df_ist_son = df_f[gosterim].reset_index(drop=True)
             st.dataframe(df_ist_son, use_container_width=True)
 
+        with sek_reg:
+            st.caption(
+                "Her hissenin 1 yıllık günlük log fiyatı zamana karşı regres "
+                "edilir. Yıllık Eğim %: yükseliş hızı. R²: düzenlilik "
+                "(1'e yakın = çizgi gibi). Skor = Eğim × R² — hem hızlı hem "
+                "düzenli yükselenler üstte."
+            )
+            if market != "turkey":
+                st.info("Regresyon analizi şimdilik sadece Türkiye "
+                        "piyasası için destekleniyor.")
+            else:
+                if st.button("Regresyonu Hesapla (tüm hisseler, ~1-2 dk)"):
+                    semboller = tuple(
+                        df["Hisse"].astype(str).str.strip() + ".IS"
+                    )
+                    with st.spinner("Fiyat geçmişi indiriliyor ve "
+                                    "regresyon hesaplanıyor..."):
+                        st.session_state["regresyon"] = (
+                            regresyon_hesapla(semboller)
+                        )
+                if "regresyon" in st.session_state:
+                    df_reg = st.session_state["regresyon"]
+                    if df_reg.empty:
+                        st.error("Fiyat geçmişi indirilemedi.")
+                    else:
+                        df_reg = df_reg.merge(
+                            df[["Hisse", "Şirket", "Sektör"]],
+                            on="Hisse", how="left",
+                        )
+                        df_reg = df_reg[
+                            ["Hisse", "Şirket", "Sektör", "Yıllık Eğim %",
+                             "R²", "Regresyon Skoru", "Gün Sayısı"]
+                        ].sort_values(
+                            "Regresyon Skoru", ascending=False
+                        ).reset_index(drop=True)
+                        st.write(f"**{len(df_reg)} hisse** analiz edildi.")
+                        st.dataframe(df_reg, use_container_width=True)
+
         with sek1:
             st.dataframe(df_genel, use_container_width=True)
         with sek2:
@@ -371,6 +473,15 @@ if "tarama" in st.session_state:
             df_ist_son.to_excel(
                 writer, index=False, sheet_name="İstikrarlı Yükselenler"
             )
+            if "regresyon" in st.session_state and market == "turkey":
+                r = st.session_state["regresyon"]
+                if not r.empty:
+                    r.merge(
+                        df[["Hisse", "Şirket", "Sektör"]],
+                        on="Hisse", how="left",
+                    ).sort_values(
+                        "Regresyon Skoru", ascending=False
+                    ).to_excel(writer, index=False, sheet_name="Regresyon")
             df_genel.to_excel(writer, index=False, sheet_name="Genel")
             df_gelir.to_excel(writer, index=False, sheet_name="Gelir Tablosu")
             df_bilanco.to_excel(writer, index=False, sheet_name="Bilanço")
