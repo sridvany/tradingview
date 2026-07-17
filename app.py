@@ -172,7 +172,7 @@ TUM_KOLONLAR = (
 
 
 @st.cache_data(ttl=3600)
-def veri_cek_v5(market: str, country: str, sadece_yerli: bool):
+def veri_cek_v5(market: str, country: str, sadece_yerli: bool, kolonlar: tuple):
     url = f"https://scanner.tradingview.com/{market}/scan"
     headers = {
         "authority": "scanner.tradingview.com",
@@ -183,8 +183,8 @@ def veri_cek_v5(market: str, country: str, sadece_yerli: bool):
         "origin": "https://www.tradingview.com",
         "referer": "https://www.tradingview.com/",
     }
-    api_alanlari = [k[0] for k in TUM_KOLONLAR]
-    gosterim_adlari = [k[1] for k in TUM_KOLONLAR]
+    api_alanlari = [k[0] for k in kolonlar]
+    gosterim_adlari = [k[1] for k in kolonlar]
 
     filtreler = [{"left": "type", "operation": "equal", "right": "stock"}]
     if sadece_yerli:
@@ -245,7 +245,9 @@ sadece_yerli = st.checkbox(
 market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    st.session_state["tarama"] = veri_cek_v5(market, country, sadece_yerli)
+    st.session_state["tarama"] = veri_cek_v5(
+        market, country, sadece_yerli, tuple(TUM_KOLONLAR)
+    )
 
 if "tarama" in st.session_state:
     df, hata = st.session_state["tarama"]
