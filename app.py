@@ -463,6 +463,21 @@ if "tarama" in st.session_state:
                                  "sonra negatifler.")
                         st.dataframe(df_reg, use_container_width=True)
 
+                        reg_buffer = io.BytesIO()
+                        with pd.ExcelWriter(
+                            reg_buffer, engine="xlsxwriter"
+                        ) as rw:
+                            df_reg.to_excel(
+                                rw, index=False, sheet_name="Regresyon"
+                            )
+                        st.download_button(
+                            label="📥 Regresyon Tablosunu İndir (Excel)",
+                            data=reg_buffer.getvalue(),
+                            file_name=f"{market}_Regresyon.xlsx",
+                            mime="application/vnd.openxmlformats-"
+                                 "officedocument.spreadsheetml.sheet",
+                        )
+
         with sek1:
             st.dataframe(df_genel, use_container_width=True)
         with sek2:
