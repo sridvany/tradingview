@@ -151,7 +151,24 @@ NAKIT_KOLONLARI = [
     ("capital_expenditures_ttm", "Yatırım Harcamaları / CapEx (TTM)"),
 ]
 
-TUM_KOLONLAR = ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI + NAKIT_KOLONLARI
+PERF_KOLONLARI = [
+    ("Perf.W", "1 Hafta %"),
+    ("Perf.1M", "1 Ay %"),
+    ("Perf.3M", "3 Ay %"),
+    ("Perf.6M", "6 Ay %"),
+    ("Perf.Y", "1 Yıl %"),
+]
+
+# Özet sekmesinde gösterilecek kolonlar
+OZET_ADLARI = [
+    "Hisse", "Şirket", "Sektör", "Piyasa Değeri",
+    "F/K (FKO)", "FAVÖK (TTM)", "Cari Oran", "Asit-Test Oranı",
+]
+
+TUM_KOLONLAR = (
+    ORTAK_KOLONLAR + GELIR_KOLONLARI + BILANCO_KOLONLARI
+    + NAKIT_KOLONLARI + PERF_KOLONLARI
+)
 
 
 @st.cache_data(ttl=3600)
@@ -228,7 +245,10 @@ sadece_yerli = st.checkbox(
 market, country = PIYASALAR[secim]
 
 if st.button("Piyasayı Tara ve Verileri Getir"):
-    df, hata = veri_cek_v5(market, country, sadece_yerli)
+    st.session_state["tarama"] = veri_cek_v5(market, country, sadece_yerli)
+
+if "tarama" in st.session_state:
+    df, hata = st.session_state["tarama"]
     if df.empty:
         st.error("Veri çekilemedi.")
         if hata:
@@ -237,14 +257,40 @@ if st.button("Piyasayı Tara ve Verileri Getir"):
         st.success(f"{secim}: {len(df)} şirket çekildi.")
 
         ortak_adlar = [k[1] for k in ORTAK_KOLONLAR]
+        perf_adlar = [k[1] for k in PERF_KOLONLARI]
+        df_ozet = df[OZET_ADLARI]
         df_genel = df[ortak_adlar]
         df_gelir = df[ortak_adlar + [k[1] for k in GELIR_KOLONLARI]]
         df_bilanco = df[ortak_adlar + [k[1] for k in BILANCO_KOLONLARI]]
         df_nakit = df[ortak_adlar + [k[1] for k in NAKIT_KOLONLARI]]
+        df_perf = df[["Hisse", "Şirket", "Sektör"] + perf_adlar]
 
-        sek1, sek2, sek3, sek4 = st.tabs(
-            ["Genel", "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
+        sek_ozet, sek_perf, sek1, sek2, sek3, sek4 = st.tabs(
+            ["Özet", "Yükselen / Düşen", "Genel",
+             "Gelir Tablosu", "Bilanço", "Nakit Akışı"]
         )
+        with sek_ozet:
+            st.dataframe(df_ozet, use_container_width=True)
+        with sek_perf:
+            periyot = st.selectbox("Periyot seç:", perf_adlar)
+            adet = st.slider("Kaç hisse listelensin?", 5, 50, 20)
+            df_p = df_perf.dropna(subset=[periyot]).sort_values(
+                periyot, ascending=False
+            )
+            df_p[periyot] = df_p[periyot].round(2)
+            kol1, kol2 = st.columns(2)
+            with kol1:
+                st.subheader(f"📈 En Çok Yükselen {adet}")
+                st.dataframe(
+                    df_p.head(adet).reset_index(drop=True),
+                    use_container_width=True,
+                )
+            with kol2:
+                st.subheader(f"📉 En Çok Düşen {adet}")
+                st.dataframe(
+                    df_p.tail(adet).iloc[::-1].reset_index(drop=True),
+                    use_container_width=True,
+                )
         with sek1:
             st.dataframe(df_genel, use_container_width=True)
         with sek2:
@@ -256,6 +302,8 @@ if st.button("Piyasayı Tara ve Verileri Getir"):
 
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+            df_ozet.to_excel(writer, index=False, sheet_name="Özet")
+            df_perf.to_excel(writer, index=False, sheet_name="Performans")
             df_genel.to_excel(writer, index=False, sheet_name="Genel")
             df_gelir.to_excel(writer, index=False, sheet_name="Gelir Tablosu")
             df_bilanco.to_excel(writer, index=False, sheet_name="Bilanço")
