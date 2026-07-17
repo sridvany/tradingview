@@ -5,27 +5,10 @@ import io
 
 st.set_page_config(page_title="TradingView Screener", page_icon="📊")
 
-# Sekme arka plan renkleri
+# Sekme yazı stili
 st.markdown("""
 <style>
-.stTabs [data-baseweb="tab-list"] { gap: 6px !important; }
-.stTabs button[data-baseweb="tab"] {
-    border-radius: 8px 8px 0 0 !important;
-    padding: 4px 14px !important;
-}
-.stTabs button[data-baseweb="tab"]:nth-of-type(1) { background-color: #FFD8A8 !important; } /* Özet */
-.stTabs button[data-baseweb="tab"]:nth-of-type(2) { background-color: #B2F2BB !important; } /* Yükselen/Düşen */
-.stTabs button[data-baseweb="tab"]:nth-of-type(3) { background-color: #A5D8FF !important; } /* İstikrarlı */
-.stTabs button[data-baseweb="tab"]:nth-of-type(4) { background-color: #D0BFFF !important; } /* Regresyon */
-.stTabs button[data-baseweb="tab"]:nth-of-type(5) { background-color: #FFC9C9 !important; } /* Genel */
-.stTabs button[data-baseweb="tab"]:nth-of-type(6) { background-color: #FFF3BF !important; } /* Gelir */
-.stTabs button[data-baseweb="tab"]:nth-of-type(7) { background-color: #99E9F2 !important; } /* Bilanço */
-.stTabs button[data-baseweb="tab"]:nth-of-type(8) { background-color: #FCC2D7 !important; } /* Nakit */
-.stTabs button[data-baseweb="tab"] p { color: #1a1a1a !important; }
-.stTabs button[data-baseweb="tab"][aria-selected="true"] {
-    border-bottom: 3px solid #1a1a1a !important;
-}
-.stTabs button[data-baseweb="tab"][aria-selected="true"] p {
+.stTabs button[data-baseweb="tab"] p {
     font-weight: 700 !important;
 }
 </style>
