@@ -272,7 +272,7 @@ def regresyon_hesapla(semboller: tuple, periyot: str, min_gun: int):
         r2 = 1 - ss_res / ss_top if ss_top > 0 else 0.0
         yillik = (np.exp(egim * 252) - 1) * 100  # yıllıklandırılmış eğim %
         sonuclar.append({
-            "Hisse": s.split(".")[0],
+            "Hisse": s.split(".")[0].replace("-", "."),
             "Yıllık Eğim %": round(yillik, 1),
             "R²": round(r2, 3),
             "Regresyon Skoru": round(yillik * r2, 1),
@@ -398,14 +398,23 @@ if "tarama" in st.session_state:
 
         with sek_reg:
             st.caption(
-                "Her hissenin 1 yıllık günlük log fiyatı zamana karşı regres "
+                "Her hissenin günlük log fiyatı zamana karşı regres "
                 "edilir. Yıllık Eğim %: yükseliş hızı. R²: düzenlilik "
                 "(1'e yakın = çizgi gibi). Skor = Eğim × R² — hem hızlı hem "
                 "düzenli yükselenler üstte."
             )
-            if market != "turkey":
-                st.info("Regresyon analizi şimdilik sadece Türkiye "
-                        "piyasası için destekleniyor.")
+            # Piyasa -> Yahoo Finance sembol son eki
+            REG_DESTEK = {
+                "turkey": ".IS",
+                "america": "",
+                "germany": ".DE",
+                "uk": ".L",
+                "france": ".PA",
+                "japan": ".T",
+            }
+            if market not in REG_DESTEK:
+                st.info("Regresyon analizi şu piyasalar için destekleniyor: "
+                        "Türkiye, ABD, Almanya, İngiltere, Fransa, Japonya.")
             else:
                 REG_PERIYOTLAR = {
                     "3 Ay": ("3mo", 40),
@@ -420,8 +429,10 @@ if "tarama" in st.session_state:
                 )
                 yf_periyot, min_gun = REG_PERIYOTLAR[reg_secim]
                 if st.button("Regresyonu Hesapla (tüm hisseler, ~1-2 dk)"):
+                    son_ek = REG_DESTEK[market]
                     semboller = tuple(
-                        df["Hisse"].astype(str).str.strip() + ".IS"
+                        df["Hisse"].astype(str).str.strip()
+                        .str.replace(".", "-", regex=False) + son_ek
                     )
                     with st.spinner("Fiyat geçmişi indiriliyor ve "
                                     "regresyon hesaplanıyor..."):
@@ -474,7 +485,7 @@ if "tarama" in st.session_state:
             df_ist_son.to_excel(
                 writer, index=False, sheet_name="İstikrarlı Yükselenler"
             )
-            if "regresyon_gosterim" in st.session_state and market == "turkey":
+            if "regresyon_gosterim" in st.session_state:
                 st.session_state["regresyon_gosterim"].to_excel(
                     writer, index=False, sheet_name="Regresyon"
                 )
