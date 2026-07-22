@@ -137,6 +137,8 @@ GELIR_KOLONLARI = [
     ("price_earnings_ttm", "F/K (FKO)"),
     ("price_book_fq", "PD/DD"),
     ("return_on_equity_fq", "ROE %"),
+    ("return_on_invested_capital_fq", "ROIC %"),
+    ("enterprise_value_ebitda_ttm", "FD/FAVÖK"),
 ]
 
 BILANCO_KOLONLARI = [
@@ -178,8 +180,9 @@ TEKNIK_KOLONLARI = [
 
 # Özet sekmesinde gösterilecek kolonlar
 OZET_ADLARI = [
-    "Hisse", "Şirket", "Sektör", "Piyasa Değeri",
-    "F/K (FKO)", "PD/DD", "ROE %", "FAVÖK (TTM)", "Cari Oran", "Asit-Test Oranı",
+    "Hisse", "Şirket", "Yıldız", "Sektör", "Piyasa Değeri",
+    "F/K (FKO)", "PD/DD", "ROE %", "ROIC %", "FD/FAVÖK", "CFO/Net Kâr",
+    "FAVÖK (TTM)", "Cari Oran", "Asit-Test Oranı",
 ]
 
 TUM_KOLONLAR = (
@@ -312,6 +315,38 @@ if "tarama" in st.session_state:
             st.code(hata)
     else:
         st.success(f"{secim}: {len(df)} şirket çekildi.")
+
+        # Türetilmiş oran: kârın nakde dönüşümü (sadece pozitif net kârda anlamlı)
+        df["CFO/Net Kâr"] = (
+            df["Faaliyet Nakit Akışı (TTM)"] / df["Net Kar (TTM)"]
+        ).where(df["Net Kar (TTM)"] > 0).round(2)
+
+        # Yıldız: 5 kriter — kalite mutlak eşik, değerleme sektör-göreli.
+        # Eksik veride kriter atlanır, puan 5'e orantılanır.
+        kriter = pd.DataFrame(index=df.index)
+        kriter["roe"] = df["ROE %"] >= 15
+        kriter["roic"] = df["ROIC %"] >= 10
+        kriter["nakit"] = df["CFO/Net Kâr"] >= 0.8
+        kriter["borc"] = df["Borç / Özkaynak"] <= 1
+        fk_poz = df["F/K (FKO)"].where(df["F/K (FKO)"] > 0)
+        fd_poz = df["FD/FAVÖK"].where(df["FD/FAVÖK"] > 0)
+        fk_med = fk_poz.groupby(df["Sektör"]).transform("median")
+        fd_med = fd_poz.groupby(df["Sektör"]).transform("median")
+        kriter["deger"] = (fk_poz <= fk_med) & (fd_poz <= fd_med)
+        gecerli = pd.DataFrame({
+            "roe": df["ROE %"].notna(),
+            "roic": df["ROIC %"].notna(),
+            "nakit": df["CFO/Net Kâr"].notna(),
+            "borc": df["Borç / Özkaynak"].notna(),
+            "deger": fk_poz.notna() & fd_poz.notna(),
+        })
+        puan = (kriter & gecerli).sum(axis=1)
+        gecerli_sayisi = gecerli.sum(axis=1)
+        yildiz_sayi = (
+            (5 * puan / gecerli_sayisi.replace(0, pd.NA))
+            .round().fillna(0).astype(int)
+        )
+        df["Yıldız"] = yildiz_sayi.map(lambda s: "★" * s + "☆" * (5 - s))
 
         ortak_adlar = [k[1] for k in ORTAK_KOLONLAR]
         perf_adlar = [k[1] for k in PERF_KOLONLARI]
@@ -519,3 +554,50 @@ if "tarama" in st.session_state:
             file_name=f"{market}_Finansallar.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+        with st.expander("📖 Oranlar Nasıl Okunmalı? (Yıldız Sistemi)"):
+            st.markdown("""
+#### Oranların tek başına anlamı
+
+| Oran | Ne ölçer? | İstenen |
+|---|---|---|
+| **F/K** | Kârın kaç katını ödüyorsun | Düşük (sektörüne göre) |
+| **PD/DD** | Özkaynağın kaç katını ödüyorsun | Düşük — ama ROE ile birlikte oku |
+| **FD/FAVÖK** | Borç dahil şirket değeri / faaliyet kârı | Düşük; F/K'dan farkı borcu da hesaba katması |
+| **ROE %** | Özkaynak kârlılığı | Yüksek (≥ %15) — ama borçla şişirilebilir |
+| **ROIC %** | Toplam yatırılan sermayenin kârlılığı | Yüksek (≥ %10) — ROE'nin kaldıraçsız hali |
+| **CFO/Net Kâr** | Kâr gerçekten nakde dönüşüyor mu | ≥ 0.8; sürekli < 1 ise kâr kalitesi şüpheli |
+| **Borç/Özkaynak** | Bilanço kaldıracı | ≤ 1; yüksekse ROE'ye güvenme |
+| **Cari / Asit-Test** | Kısa vadeli borç ödeme gücü | ≥ 1; asit-test stokları saymaz |
+
+#### Birlikte nasıl okunur?
+
+Tek oran tek başına yanıltır — okuma sırası:
+
+1. **Kalite:** ROE + ROIC + Borç/Özkaynak + CFO/Net Kâr birlikte.
+   ROE yüksek ama ROIC düşükse kârlılık borçtan geliyordur.
+   CFO/Net Kâr düşükse kâr kağıt üzerindedir.
+2. **Değerleme:** F/K + PD/DD + FD/FAVÖK, **aynı sektördeki
+   emsallerle** kıyaslanır. Mutlak eşik yok: bankada PD/DD ~1,
+   yazılımda 5+ normal olabilir.
+3. **Tuzaklar:**
+   - Düşük F/K + düşük PD/DD + **düşük ROE** → değer tuzağı
+   - Yüksek ROE + çok düşük PD/DD → piyasa bir şey biliyor olabilir
+     (tek seferlik kâr, yüksek kaldıraç, kâr kalitesi)
+   - Yüksek PD/DD + **sürdürülebilir** yüksek ROE → makul prim
+
+#### Yıldız nasıl hesaplanıyor? (★ 0–5)
+
+Her sağlanan kriter 1 yıldız:
+
+1. ROE ≥ %15 (kalite)
+2. ROIC ≥ %10 (kaldıraçsız kalite)
+3. CFO/Net Kâr ≥ 0.8 (kâr nakde dönüşüyor)
+4. Borç/Özkaynak ≤ 1 (bilanço sağlığı)
+5. F/K **ve** FD/FAVÖK kendi sektör medyanının altında (göreli ucuzluk)
+
+Verisi eksik kriter değerlendirme dışı bırakılır, puan 5'e
+orantılanır (ör. bankalarda FD/FAVÖK yoktur — kalan kriterlerden
+hesaplanır). ★★★★★ "al" demek değildir; kalite + ucuzluk
+kombinasyonunun mekanik bir özetidir. Yatırım tavsiyesi değildir.
+""")
