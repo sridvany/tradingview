@@ -136,6 +136,7 @@ GELIR_KOLONLARI = [
     ("net_margin_ttm", "Net Marj % (TTM)"),
     ("price_earnings_ttm", "F/K (FKO)"),
     ("price_book_fq", "PD/DD"),
+    ("return_on_equity_fq", "ROE %"),
 ]
 
 BILANCO_KOLONLARI = [
@@ -178,7 +179,7 @@ TEKNIK_KOLONLARI = [
 # Özet sekmesinde gösterilecek kolonlar
 OZET_ADLARI = [
     "Hisse", "Şirket", "Sektör", "Piyasa Değeri",
-    "F/K (FKO)", "PD/DD", "FAVÖK (TTM)", "Cari Oran", "Asit-Test Oranı",
+    "F/K (FKO)", "PD/DD", "ROE %", "FAVÖK (TTM)", "Cari Oran", "Asit-Test Oranı",
 ]
 
 TUM_KOLONLAR = (
