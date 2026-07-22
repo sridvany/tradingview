@@ -343,7 +343,7 @@ if "tarama" in st.session_state:
         puan = (kriter & gecerli).sum(axis=1)
         gecerli_sayisi = gecerli.sum(axis=1)
         yildiz_sayi = (
-            (5 * puan / gecerli_sayisi.replace(0, pd.NA))
+            (5 * puan / gecerli_sayisi.where(gecerli_sayisi > 0))
             .round().fillna(0).astype(int)
         )
         df["Yıldız"] = yildiz_sayi.map(lambda s: "★" * s + "☆" * (5 - s))
